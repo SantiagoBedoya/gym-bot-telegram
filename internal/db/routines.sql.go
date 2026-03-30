@@ -113,6 +113,30 @@ func (q *Queries) InsertExercise(ctx context.Context, arg InsertExerciseParams) 
 	return i, err
 }
 
+const listRoutines = `-- name: ListRoutines :many
+SELECT name FROM routines ORDER BY name
+`
+
+func (q *Queries) ListRoutines(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listRoutines)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertRoutine = `-- name: UpsertRoutine :one
 INSERT INTO routines (name)
 VALUES ($1)

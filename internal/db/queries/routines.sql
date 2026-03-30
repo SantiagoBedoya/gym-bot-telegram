@@ -15,6 +15,9 @@ INSERT INTO exercises (routine_id, name, position, sets, reps_min, reps_max, not
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
+-- name: ListRoutines :many
+SELECT name FROM routines ORDER BY name;
+
 -- name: GetExercisesByRoutine :many
 SELECT e.*
 FROM exercises e

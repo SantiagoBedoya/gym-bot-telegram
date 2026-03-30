@@ -57,6 +57,14 @@ func (d *Dispatcher) Definitions() []responses.ToolUnionParam {
 			},
 		}},
 		{OfFunction: &responses.FunctionToolParam{
+			Name:        "list_routines",
+			Description: openai.String("Lista los nombres de todas las rutinas guardadas por el usuario."),
+			Parameters: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		}},
+		{OfFunction: &responses.FunctionToolParam{
 			Name:        "get_routine",
 			Description: openai.String("Obtiene la lista de ejercicios de una rutina con sus series y rangos de repeticiones objetivo."),
 			Parameters: map[string]any{
@@ -126,6 +134,8 @@ func (d *Dispatcher) Definitions() []responses.ToolUnionParam {
 
 func (d *Dispatcher) Execute(ctx context.Context, name, argsJSON string) (string, error) {
 	switch name {
+	case "list_routines":
+		return d.listRoutines(ctx)
 	case "save_routine":
 		return d.saveRoutine(ctx, argsJSON)
 	case "get_routine":
@@ -138,6 +148,15 @@ func (d *Dispatcher) Execute(ctx context.Context, name, argsJSON string) (string
 		return d.getLastSessionSummary(ctx, argsJSON)
 	}
 	return "", fmt.Errorf("unknown tool: %s", name)
+}
+
+func (d *Dispatcher) listRoutines(ctx context.Context) (string, error) {
+	names, err := d.queries.ListRoutines(ctx)
+	if err != nil {
+		return "", err
+	}
+	result, _ := json.Marshal(map[string]any{"routines": names})
+	return string(result), nil
 }
 
 func (d *Dispatcher) saveRoutine(ctx context.Context, argsJSON string) (string, error) {

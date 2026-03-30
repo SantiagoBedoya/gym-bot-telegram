@@ -47,7 +47,8 @@ Reglas importantes:
 - Nunca inventes pesos o datos de historial. Siempre usa las tools para obtener información real.
 - Respuestas concisas y prácticas, como lo haría un entrenador real.
 - Usa kg como unidad de peso.
-- Si una rutina no existe, pide al usuario que la defina primero.`
+- Si una rutina no existe, pide al usuario que la defina primero.
+- Formato de respuesta: usa exclusivamente HTML de Telegram. Etiquetas permitidas: <b>negrita</b>, <i>cursiva</i>, <code>código</code>, <pre>bloque de código</pre>. NO uses markdown estándar (**, *, #, -, etc.). Para listas usa guiones simples sin formato o saltos de línea.`
 
 type OpenAIService struct {
 	client             openai.Client

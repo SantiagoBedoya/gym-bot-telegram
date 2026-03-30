@@ -58,7 +58,8 @@ func (h *TelegramHandler) Handle(ctx context.Context, b *tgbot.Bot, update *mode
 	}
 
 	b.SendMessage(ctx, &tgbot.SendMessageParams{
-		ChatID: chatID,
-		Text:   response,
+		ChatID:    chatID,
+		Text:      response,
+		ParseMode: models.ParseModeHTML,
 	})
 }

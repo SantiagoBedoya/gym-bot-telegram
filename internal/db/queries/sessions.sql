@@ -19,6 +19,13 @@ SELECT * FROM session_sets
 WHERE session_id = $1
 ORDER BY exercise_name, set_number;
 
+-- name: GetTodaySession :one
+SELECT id, routine_name, started_at FROM sessions
+WHERE routine_name = $1
+AND DATE(started_at) = CURRENT_DATE
+ORDER BY started_at DESC
+LIMIT 1;
+
 -- name: GetExerciseHistory :many
 SELECT
     ss.id,

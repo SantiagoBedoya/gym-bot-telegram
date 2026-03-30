@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/openai/openai-go"
@@ -16,6 +17,7 @@ import (
 )
 
 const botStateKey = "previous_response_id"
+const botStateDateKey = "previous_response_date"
 
 const systemPrompt = `Eres un entrenador personal de fuerza integrado en un bot de Telegram.
 Respondes en el mismo idioma que use el usuario (español o inglés).
@@ -66,6 +68,18 @@ func NewOpenAIService(apiKey, model string, queries *db.Queries, dispatcher *too
 }
 
 func (s *OpenAIService) LoadState(ctx context.Context) {
+	storedDate, err := s.queries.GetBotState(ctx, botStateDateKey)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			log.Printf("warn: could not load bot state date: %v", err)
+		}
+		return
+	}
+	today := time.Now().Format("2006-01-02")
+	if storedDate != today {
+		log.Printf("new day (%s), resetting conversation context", today)
+		return
+	}
 	val, err := s.queries.GetBotState(ctx, botStateKey)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -143,5 +157,12 @@ func (s *OpenAIService) saveState(ctx context.Context) {
 		Value: s.previousResponseID,
 	}); err != nil {
 		log.Printf("warn: could not save bot state: %v", err)
+	}
+	today := time.Now().Format("2006-01-02")
+	if err := s.queries.UpsertBotState(ctx, db.UpsertBotStateParams{
+		Key:   botStateDateKey,
+		Value: today,
+	}); err != nil {
+		log.Printf("warn: could not save bot state date: %v", err)
 	}
 }

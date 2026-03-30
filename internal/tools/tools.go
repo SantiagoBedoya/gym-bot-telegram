@@ -289,9 +289,12 @@ func (d *Dispatcher) logSessionSets(ctx context.Context, argsJSON string) (strin
 
 	qtx := db.New(tx)
 
-	session, err := qtx.CreateSession(ctx, args.RoutineName)
+	session, err := qtx.GetTodaySession(ctx, args.RoutineName)
 	if err != nil {
-		return "", err
+		session, err = qtx.CreateSession(ctx, args.RoutineName)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	for _, s := range args.Sets {

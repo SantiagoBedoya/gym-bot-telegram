@@ -136,6 +136,21 @@ func (q *Queries) GetSessionSetsBySession(ctx context.Context, sessionID int32) 
 	return items, nil
 }
 
+const getTodaySession = `-- name: GetTodaySession :one
+SELECT id, routine_name, started_at FROM sessions
+WHERE routine_name = $1
+AND DATE(started_at) = CURRENT_DATE
+ORDER BY started_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetTodaySession(ctx context.Context, routineName string) (Session, error) {
+	row := q.db.QueryRow(ctx, getTodaySession, routineName)
+	var i Session
+	err := row.Scan(&i.ID, &i.RoutineName, &i.StartedAt)
+	return i, err
+}
+
 const insertSessionSet = `-- name: InsertSessionSet :one
 INSERT INTO session_sets (session_id, exercise_name, set_number, reps, weight_kg, rpe)
 VALUES ($1, $2, $3, $4, $5, $6)

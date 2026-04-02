@@ -101,6 +101,21 @@ func (q *Queries) GetLastSessionByRoutine(ctx context.Context, routineName strin
 	return i, err
 }
 
+const getPreviousSessionByRoutine = `-- name: GetPreviousSessionByRoutine :one
+SELECT id, routine_name, started_at FROM sessions
+WHERE routine_name = $1
+  AND DATE(started_at) < CURRENT_DATE
+ORDER BY started_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetPreviousSessionByRoutine(ctx context.Context, routineName string) (Session, error) {
+	row := q.db.QueryRow(ctx, getPreviousSessionByRoutine, routineName)
+	var i Session
+	err := row.Scan(&i.ID, &i.RoutineName, &i.StartedAt)
+	return i, err
+}
+
 const getSessionSetsBySession = `-- name: GetSessionSetsBySession :many
 SELECT id, session_id, exercise_name, set_number, reps, weight_kg, rpe, logged_at FROM session_sets
 WHERE session_id = $1

@@ -14,6 +14,13 @@ WHERE routine_name = $1
 ORDER BY started_at DESC
 LIMIT 1;
 
+-- name: GetPreviousSessionByRoutine :one
+SELECT * FROM sessions
+WHERE routine_name = $1
+  AND DATE(started_at) < CURRENT_DATE
+ORDER BY started_at DESC
+LIMIT 1;
+
 -- name: GetSessionSetsBySession :many
 SELECT * FROM session_sets
 WHERE session_id = $1

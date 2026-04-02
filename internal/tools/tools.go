@@ -120,7 +120,7 @@ func (d *Dispatcher) Definitions() []responses.ToolUnionParam {
 		}},
 		{OfFunction: &responses.FunctionToolParam{
 			Name:        "get_last_session_summary",
-			Description: openai.String("Obtiene el resumen de la última sesión de entrenamiento para una rutina."),
+			Description: openai.String("Obtiene el resumen completo de la sesión anterior (no la de hoy) de una rutina: ejercicios, pesos, reps y RPE. Úsalo SIEMPRE antes de planificar un entrenamiento para calcular la progresión correcta."),
 			Parameters: map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -355,9 +355,9 @@ func (d *Dispatcher) getLastSessionSummary(ctx context.Context, argsJSON string)
 		return "", err
 	}
 
-	session, err := d.queries.GetLastSessionByRoutine(ctx, args.RoutineName)
+	session, err := d.queries.GetPreviousSessionByRoutine(ctx, args.RoutineName)
 	if err != nil {
-		return fmt.Sprintf(`{"error": "no sessions found for routine '%s'"}`, args.RoutineName), nil
+		return fmt.Sprintf(`{"error": "no previous sessions found for routine '%s'"}`, args.RoutineName), nil
 	}
 
 	sets, err := d.queries.GetSessionSetsBySession(ctx, session.ID)

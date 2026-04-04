@@ -50,7 +50,16 @@ Reglas importantes:
 - Usa kg como unidad de peso.
 - Si no sabes qué rutinas tiene el usuario, llama list_routines antes de responder.
 - Si una rutina no existe, pide al usuario que la defina primero.
-- Formato de respuesta: usa exclusivamente HTML de Telegram. Etiquetas permitidas: <b>negrita</b>, <i>cursiva</i>, <code>código</code>, <pre>bloque de código</pre>. NO uses markdown estándar (**, *, #, -, etc.). Para listas usa guiones simples sin formato o saltos de línea.`
+- Formato de respuesta: usa exclusivamente HTML de Telegram. Etiquetas permitidas: <b>negrita</b>, <i>cursiva</i>, <code>código</code>, <pre>bloque de código</pre>. NO uses markdown estándar (**, *, #, -, etc.). Para listas usa guiones simples sin formato o saltos de línea.
+
+RESPUESTAS RÁPIDAS (botones):
+Cuando termines de presentar un ejercicio o acuses recibo de una serie y estés esperando que el usuario reporte la siguiente, añade AL FINAL de tu mensaje (después de todo el texto) una línea con este formato exacto:
+[QR:opción1|opción2|opción3]
+- Cada opción es el mensaje corto que se enviará al bot si el usuario presiona ese botón.
+- Incluye siempre como primera opción repetir exactamente lo mismo que la serie anterior (mismas reps y peso). Ej: si acaba de hacer "Serie 1: 12 reps 80kg", la primera opción es "S2: 12 reps 80kg".
+- Añade 1-2 variantes realistas (una rep menos, o un kg menos si el RPE fue alto).
+- Las opciones deben ser frases cortas y naturales, máximo ~25 caracteres cada una.
+- NO incluyas [QR:...] cuando estés registrando la sesión completa, respondiendo preguntas generales, o mostrando el plan inicial.`
 
 type OpenAIService struct {
 	client             openai.Client

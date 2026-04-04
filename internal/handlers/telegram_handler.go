@@ -3,26 +3,35 @@ package handlers
 import (
 	"context"
 	"log"
+	"strings"
 
 	tgbot "github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
+	"github.com/SantiagoBedoya/gym-bot/internal/db"
 	"github.com/SantiagoBedoya/gym-bot/internal/services"
 )
 
 type TelegramHandler struct {
 	openAI           *services.OpenAIService
+	queries          *db.Queries
 	authorizedUserID int64
 }
 
-func NewTelegramHandler(openAI *services.OpenAIService, authorizedUserID int64) *TelegramHandler {
+func NewTelegramHandler(openAI *services.OpenAIService, queries *db.Queries, authorizedUserID int64) *TelegramHandler {
 	return &TelegramHandler{
 		openAI:           openAI,
+		queries:          queries,
 		authorizedUserID: authorizedUserID,
 	}
 }
 
 func (h *TelegramHandler) Handle(ctx context.Context, b *tgbot.Bot, update *models.Update) {
+	if update.CallbackQuery != nil {
+		h.handleCallback(ctx, b, update.CallbackQuery)
+		return
+	}
+
 	if update.Message == nil {
 		return
 	}
@@ -37,12 +46,63 @@ func (h *TelegramHandler) Handle(ctx context.Context, b *tgbot.Bot, update *mode
 
 	chatID := update.Message.Chat.ID
 
-	// Send typing indicator
+	if userMessage == "/menu" {
+		h.sendMenu(ctx, b, chatID)
+		return
+	}
+
+	h.chat(ctx, b, chatID, userMessage)
+}
+
+func (h *TelegramHandler) handleCallback(ctx context.Context, b *tgbot.Bot, cq *models.CallbackQuery) {
+	if cq.From.ID != h.authorizedUserID {
+		return
+	}
+
+	b.AnswerCallbackQuery(ctx, &tgbot.AnswerCallbackQueryParams{
+		CallbackQueryID: cq.ID,
+	})
+
+	if cq.Message.Type != models.MaybeInaccessibleMessageTypeMessage || cq.Message.Message == nil {
+		return
+	}
+	chatID := cq.Message.Message.Chat.ID
+
 	b.SendChatAction(ctx, &tgbot.SendChatActionParams{
 		ChatID: chatID,
 		Action: models.ChatActionTyping,
 	})
 
+	h.chat(ctx, b, chatID, cq.Data)
+}
+
+func (h *TelegramHandler) sendMenu(ctx context.Context, b *tgbot.Bot, chatID int64) {
+	routines, err := h.queries.ListRoutines(ctx)
+	if err != nil {
+		log.Printf("error listing routines: %v", err)
+	}
+
+	var rows [][]models.InlineKeyboardButton
+	for _, r := range routines {
+		rows = append(rows, []models.InlineKeyboardButton{
+			{Text: "Entrenar " + r, CallbackData: "Hoy entreno " + r},
+		})
+	}
+	rows = append(rows, []models.InlineKeyboardButton{
+		{Text: "Ver mis rutinas", CallbackData: "Lista mis rutinas"},
+		{Text: "Ultima sesion", CallbackData: "Cual fue mi ultima sesion"},
+	})
+
+	b.SendMessage(ctx, &tgbot.SendMessageParams{
+		ChatID: chatID,
+		Text:   "Que hacemos hoy?",
+		ReplyMarkup: &models.InlineKeyboardMarkup{
+			InlineKeyboard: rows,
+		},
+	})
+}
+
+func (h *TelegramHandler) chat(ctx context.Context, b *tgbot.Bot, chatID int64, userMessage string) {
 	response, err := h.openAI.Chat(ctx, userMessage)
 	if err != nil {
 		log.Printf("openai error: %v", err)
@@ -57,9 +117,57 @@ func (h *TelegramHandler) Handle(ctx context.Context, b *tgbot.Bot, update *mode
 		response = "No obtuve respuesta. Intenta de nuevo."
 	}
 
+	text, keyboard := parseQuickReplies(response)
+
 	b.SendMessage(ctx, &tgbot.SendMessageParams{
-		ChatID:    chatID,
-		Text:      response,
-		ParseMode: models.ParseModeHTML,
+		ChatID:      chatID,
+		Text:        text,
+		ParseMode:   models.ParseModeHTML,
+		ReplyMarkup: keyboard,
 	})
+}
+
+// parseQuickReplies extracts a [QR:opt1|opt2|...] tag from the end of the AI response.
+// Returns the clean text and an inline keyboard (nil if no tag found).
+func parseQuickReplies(text string) (string, *models.InlineKeyboardMarkup) {
+	const prefix = "[QR:"
+	idx := strings.LastIndex(text, prefix)
+	if idx == -1 {
+		return text, nil
+	}
+	end := strings.Index(text[idx:], "]")
+	if end == -1 {
+		return text, nil
+	}
+
+	tag := text[idx : idx+end+1]
+	inner := tag[len(prefix) : len(tag)-1]
+	options := strings.Split(inner, "|")
+
+	var rows [][]models.InlineKeyboardButton
+	var row []models.InlineKeyboardButton
+	for _, opt := range options {
+		opt = strings.TrimSpace(opt)
+		if opt == "" {
+			continue
+		}
+		row = append(row, models.InlineKeyboardButton{
+			Text:         opt,
+			CallbackData: opt,
+		})
+		if len(row) == 2 {
+			rows = append(rows, row)
+			row = nil
+		}
+	}
+	if len(row) > 0 {
+		rows = append(rows, row)
+	}
+
+	if len(rows) == 0 {
+		return text, nil
+	}
+
+	cleanText := strings.TrimSpace(text[:idx])
+	return cleanText, &models.InlineKeyboardMarkup{InlineKeyboard: rows}
 }

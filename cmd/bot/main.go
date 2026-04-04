@@ -44,7 +44,7 @@ func main() {
 	openAISvc.LoadState(ctx)
 
 	// Telegram handler
-	handler := handlers.NewTelegramHandler(openAISvc, cfg.AuthorizedUserID)
+	handler := handlers.NewTelegramHandler(openAISvc, queries, cfg.AuthorizedUserID)
 
 	// Bot
 	bot, err := tgbot.New(cfg.BotToken, tgbot.WithDefaultHandler(handler.Handle))

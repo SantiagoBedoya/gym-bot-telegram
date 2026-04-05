@@ -35,7 +35,12 @@ func (h *TelegramHandler) Handle(ctx context.Context, b *tgbot.Bot, update *mode
 	if update.Message == nil {
 		return
 	}
-	if update.Message.From == nil || update.Message.From.ID != h.authorizedUserID {
+	if update.Message.From == nil {
+		return
+	}
+	log.Printf("[DEBUG] mensaje de user ID: %d (autorizado: %d)", update.Message.From.ID, h.authorizedUserID)
+	if update.Message.From.ID != h.authorizedUserID {
+		log.Printf("[DEBUG] mensaje rechazado: ID no autorizado")
 		return
 	}
 

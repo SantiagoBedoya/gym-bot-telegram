@@ -9,6 +9,7 @@ import (
 type Config struct {
 	BotToken         string
 	OpenAIAPIKey     string
+	AssemblyAIAPIKey string
 	DatabaseURL      string
 	AuthorizedUserID int64
 	OpenAIModel      string
@@ -39,6 +40,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("invalid AUTHORIZED_USER_ID: %w", err)
 	}
 
+	assemblyAIKey := os.Getenv("ASSEMBLYAI_API_KEY")
+	if assemblyAIKey == "" {
+		return nil, fmt.Errorf("ASSEMBLYAI_API_KEY is required")
+	}
+
 	model := os.Getenv("OPENAI_MODEL")
 	if model == "" {
 		model = "gpt-4o"
@@ -47,6 +53,7 @@ func Load() (*Config, error) {
 	return &Config{
 		BotToken:         botToken,
 		OpenAIAPIKey:     openAIKey,
+		AssemblyAIAPIKey: assemblyAIKey,
 		DatabaseURL:      dbURL,
 		AuthorizedUserID: userID,
 		OpenAIModel:      model,

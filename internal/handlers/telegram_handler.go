@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"strings"
 
 	tgbot "github.com/go-telegram/bot"
@@ -16,14 +19,18 @@ var greetings = []string{"hola", "hi", "hello", "hey", "buenas", "buenos", "good
 
 type TelegramHandler struct {
 	openAI           *services.OpenAIService
+	transcription    *services.TranscriptionService
 	queries          *db.Queries
+	botToken         string
 	authorizedUserID int64
 }
 
-func NewTelegramHandler(openAI *services.OpenAIService, queries *db.Queries, authorizedUserID int64) *TelegramHandler {
+func NewTelegramHandler(openAI *services.OpenAIService, transcription *services.TranscriptionService, queries *db.Queries, botToken string, authorizedUserID int64) *TelegramHandler {
 	return &TelegramHandler{
 		openAI:           openAI,
+		transcription:    transcription,
 		queries:          queries,
+		botToken:         botToken,
 		authorizedUserID: authorizedUserID,
 	}
 }
@@ -41,12 +48,18 @@ func (h *TelegramHandler) Handle(ctx context.Context, b *tgbot.Bot, update *mode
 		return
 	}
 
+	chatID := update.Message.Chat.ID
+
+	// Voice message
+	if update.Message.Voice != nil {
+		h.handleVoice(ctx, b, chatID, update.Message.Voice.FileID)
+		return
+	}
+
 	userMessage := update.Message.Text
 	if userMessage == "" {
 		return
 	}
-
-	chatID := update.Message.Chat.ID
 
 	if isGreeting(userMessage) {
 		h.sendRoutineMenu(ctx, b, chatID)
@@ -54,6 +67,61 @@ func (h *TelegramHandler) Handle(ctx context.Context, b *tgbot.Bot, update *mode
 	}
 
 	h.chat(ctx, b, chatID, userMessage)
+}
+
+func (h *TelegramHandler) handleVoice(ctx context.Context, b *tgbot.Bot, chatID int64, fileID string) {
+	b.SendChatAction(ctx, &tgbot.SendChatActionParams{
+		ChatID: chatID,
+		Action: models.ChatActionTyping,
+	})
+
+	audio, err := h.downloadFile(ctx, b, fileID)
+	if err != nil {
+		log.Printf("[ERROR] downloading voice file: %v", err)
+		b.SendMessage(ctx, &tgbot.SendMessageParams{
+			ChatID: chatID,
+			Text:   "No pude descargar el audio. Intenta de nuevo.",
+		})
+		return
+	}
+
+	text, err := h.transcription.Transcribe(ctx, audio)
+	if err != nil {
+		log.Printf("[ERROR] transcribing voice: %v", err)
+		b.SendMessage(ctx, &tgbot.SendMessageParams{
+			ChatID: chatID,
+			Text:   "No pude transcribir el audio. Intenta de nuevo.",
+		})
+		return
+	}
+
+	if isGreeting(text) {
+		h.sendRoutineMenu(ctx, b, chatID)
+		return
+	}
+
+	h.chat(ctx, b, chatID, text)
+}
+
+func (h *TelegramHandler) downloadFile(ctx context.Context, b *tgbot.Bot, fileID string) ([]byte, error) {
+	f, err := b.GetFile(ctx, &tgbot.GetFileParams{FileID: fileID})
+	if err != nil {
+		return nil, fmt.Errorf("get file info: %w", err)
+	}
+
+	url := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", h.botToken, f.FilePath)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return io.ReadAll(resp.Body)
 }
 
 func (h *TelegramHandler) handleCallback(ctx context.Context, b *tgbot.Bot, cq *models.CallbackQuery) {

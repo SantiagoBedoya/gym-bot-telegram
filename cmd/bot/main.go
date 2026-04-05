@@ -44,8 +44,11 @@ func main() {
 	openAISvc := services.NewOpenAIService(cfg.OpenAIAPIKey, cfg.OpenAIModel, queries, dispatcher)
 	openAISvc.LoadState(ctx)
 
+	// Transcription service
+	transcriptionSvc := services.NewTranscriptionService(cfg.AssemblyAIAPIKey)
+
 	// Telegram handler
-	handler := handlers.NewTelegramHandler(openAISvc, queries, cfg.AuthorizedUserID)
+	handler := handlers.NewTelegramHandler(openAISvc, transcriptionSvc, queries, cfg.BotToken, cfg.AuthorizedUserID)
 
 	// Bot
 	bot, err := tgbot.New(cfg.BotToken, tgbot.WithDefaultHandler(handler.Handle))

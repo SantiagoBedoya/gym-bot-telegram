@@ -8,17 +8,22 @@ import (
 	tgbot "github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
+	"github.com/SantiagoBedoya/gym-bot/internal/db"
 	"github.com/SantiagoBedoya/gym-bot/internal/services"
 )
 
+var greetings = []string{"hola", "hi", "hello", "hey", "buenas", "buenos", "good morning", "good afternoon", "good evening", "ey", "epa", "qué más"}
+
 type TelegramHandler struct {
 	openAI           *services.OpenAIService
+	queries          *db.Queries
 	authorizedUserID int64
 }
 
-func NewTelegramHandler(openAI *services.OpenAIService, authorizedUserID int64) *TelegramHandler {
+func NewTelegramHandler(openAI *services.OpenAIService, queries *db.Queries, authorizedUserID int64) *TelegramHandler {
 	return &TelegramHandler{
 		openAI:           openAI,
+		queries:          queries,
 		authorizedUserID: authorizedUserID,
 	}
 }
@@ -29,15 +34,10 @@ func (h *TelegramHandler) Handle(ctx context.Context, b *tgbot.Bot, update *mode
 		return
 	}
 
-	if update.Message == nil {
+	if update.Message == nil || update.Message.From == nil {
 		return
 	}
-	if update.Message.From == nil {
-		return
-	}
-	log.Printf("[DEBUG] mensaje de user ID: %d (autorizado: %d)", update.Message.From.ID, h.authorizedUserID)
 	if update.Message.From.ID != h.authorizedUserID {
-		log.Printf("[DEBUG] mensaje rechazado: ID no autorizado")
 		return
 	}
 
@@ -47,6 +47,11 @@ func (h *TelegramHandler) Handle(ctx context.Context, b *tgbot.Bot, update *mode
 	}
 
 	chatID := update.Message.Chat.ID
+
+	if isGreeting(userMessage) {
+		h.sendRoutineMenu(ctx, b, chatID)
+		return
+	}
 
 	h.chat(ctx, b, chatID, userMessage)
 }
@@ -73,26 +78,51 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, b *tgbot.Bot, cq *
 	h.chat(ctx, b, chatID, cq.Data)
 }
 
+func (h *TelegramHandler) sendRoutineMenu(ctx context.Context, b *tgbot.Bot, chatID int64) {
+	routines, err := h.queries.ListRoutines(ctx)
+	if err != nil {
+		log.Printf("[ERROR] listing routines for menu: %v", err)
+	}
+
+	var rows [][]models.InlineKeyboardButton
+	for _, r := range routines {
+		rows = append(rows, []models.InlineKeyboardButton{
+			{Text: "Entrenar " + r, CallbackData: "Hoy entreno " + r},
+		})
+	}
+	rows = append(rows, []models.InlineKeyboardButton{
+		{Text: "Ver mis rutinas", CallbackData: "Lista mis rutinas"},
+		{Text: "Ultima sesion", CallbackData: "Cual fue mi ultima sesion"},
+	})
+
+	_, err = b.SendMessage(ctx, &tgbot.SendMessageParams{
+		ChatID: chatID,
+		Text:   "Que hacemos hoy?",
+		ReplyMarkup: &models.InlineKeyboardMarkup{
+			InlineKeyboard: rows,
+		},
+	})
+	if err != nil {
+		log.Printf("[ERROR] sending routine menu to chat %d: %v", chatID, err)
+	}
+}
 
 func (h *TelegramHandler) chat(ctx context.Context, b *tgbot.Bot, chatID int64, userMessage string) {
-	log.Printf("[DEBUG] llamando OpenAI con mensaje: %q", userMessage)
 	response, err := h.openAI.Chat(ctx, userMessage)
 	if err != nil {
-		log.Printf("[DEBUG] openai error: %v", err)
+		log.Printf("[ERROR] openai chat: %v", err)
 		b.SendMessage(ctx, &tgbot.SendMessageParams{
 			ChatID: chatID,
 			Text:   "Hubo un error al procesar tu mensaje. Intenta de nuevo.",
 		})
 		return
 	}
-	log.Printf("[DEBUG] respuesta OpenAI (len=%d): %q", len(response), response)
 
 	if response == "" {
 		response = "No obtuve respuesta. Intenta de nuevo."
 	}
 
 	text, keyboard := parseQuickReplies(response)
-	log.Printf("[DEBUG] enviando mensaje a chatID %d", chatID)
 	params := &tgbot.SendMessageParams{
 		ChatID:    chatID,
 		Text:      text,
@@ -101,10 +131,19 @@ func (h *TelegramHandler) chat(ctx context.Context, b *tgbot.Bot, chatID int64, 
 	if keyboard != nil {
 		params.ReplyMarkup = keyboard
 	}
-	_, sendErr := b.SendMessage(ctx, params)
-	if sendErr != nil {
-		log.Printf("[DEBUG] error enviando mensaje: %v", sendErr)
+	if _, err := b.SendMessage(ctx, params); err != nil {
+		log.Printf("[ERROR] sending message to chat %d: %v", chatID, err)
 	}
+}
+
+func isGreeting(msg string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(msg))
+	for _, g := range greetings {
+		if normalized == g || strings.HasPrefix(normalized, g+" ") {
+			return true
+		}
+	}
+	return false
 }
 
 // parseQuickReplies extracts a [QR:opt1|opt2|...] tag from the end of the AI response.

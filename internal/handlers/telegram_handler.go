@@ -108,28 +108,33 @@ func (h *TelegramHandler) sendMenu(ctx context.Context, b *tgbot.Bot, chatID int
 }
 
 func (h *TelegramHandler) chat(ctx context.Context, b *tgbot.Bot, chatID int64, userMessage string) {
+	log.Printf("[DEBUG] llamando OpenAI con mensaje: %q", userMessage)
 	response, err := h.openAI.Chat(ctx, userMessage)
 	if err != nil {
-		log.Printf("openai error: %v", err)
+		log.Printf("[DEBUG] openai error: %v", err)
 		b.SendMessage(ctx, &tgbot.SendMessageParams{
 			ChatID: chatID,
 			Text:   "Hubo un error al procesar tu mensaje. Intenta de nuevo.",
 		})
 		return
 	}
+	log.Printf("[DEBUG] respuesta OpenAI (len=%d): %q", len(response), response)
 
 	if response == "" {
 		response = "No obtuve respuesta. Intenta de nuevo."
 	}
 
 	text, keyboard := parseQuickReplies(response)
-
-	b.SendMessage(ctx, &tgbot.SendMessageParams{
+	log.Printf("[DEBUG] enviando mensaje a chatID %d", chatID)
+	_, sendErr := b.SendMessage(ctx, &tgbot.SendMessageParams{
 		ChatID:      chatID,
 		Text:        text,
 		ParseMode:   models.ParseModeHTML,
 		ReplyMarkup: keyboard,
 	})
+	if sendErr != nil {
+		log.Printf("[DEBUG] error enviando mensaje: %v", sendErr)
+	}
 }
 
 // parseQuickReplies extracts a [QR:opt1|opt2|...] tag from the end of the AI response.

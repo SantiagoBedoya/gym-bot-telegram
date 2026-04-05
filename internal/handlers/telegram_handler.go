@@ -8,20 +8,17 @@ import (
 	tgbot "github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
-	"github.com/SantiagoBedoya/gym-bot/internal/db"
 	"github.com/SantiagoBedoya/gym-bot/internal/services"
 )
 
 type TelegramHandler struct {
 	openAI           *services.OpenAIService
-	queries          *db.Queries
 	authorizedUserID int64
 }
 
-func NewTelegramHandler(openAI *services.OpenAIService, queries *db.Queries, authorizedUserID int64) *TelegramHandler {
+func NewTelegramHandler(openAI *services.OpenAIService, authorizedUserID int64) *TelegramHandler {
 	return &TelegramHandler{
 		openAI:           openAI,
-		queries:          queries,
 		authorizedUserID: authorizedUserID,
 	}
 }
@@ -51,11 +48,6 @@ func (h *TelegramHandler) Handle(ctx context.Context, b *tgbot.Bot, update *mode
 
 	chatID := update.Message.Chat.ID
 
-	if userMessage == "/menu" {
-		h.sendMenu(ctx, b, chatID)
-		return
-	}
-
 	h.chat(ctx, b, chatID, userMessage)
 }
 
@@ -81,31 +73,6 @@ func (h *TelegramHandler) handleCallback(ctx context.Context, b *tgbot.Bot, cq *
 	h.chat(ctx, b, chatID, cq.Data)
 }
 
-func (h *TelegramHandler) sendMenu(ctx context.Context, b *tgbot.Bot, chatID int64) {
-	routines, err := h.queries.ListRoutines(ctx)
-	if err != nil {
-		log.Printf("error listing routines: %v", err)
-	}
-
-	var rows [][]models.InlineKeyboardButton
-	for _, r := range routines {
-		rows = append(rows, []models.InlineKeyboardButton{
-			{Text: "Entrenar " + r, CallbackData: "Hoy entreno " + r},
-		})
-	}
-	rows = append(rows, []models.InlineKeyboardButton{
-		{Text: "Ver mis rutinas", CallbackData: "Lista mis rutinas"},
-		{Text: "Ultima sesion", CallbackData: "Cual fue mi ultima sesion"},
-	})
-
-	b.SendMessage(ctx, &tgbot.SendMessageParams{
-		ChatID: chatID,
-		Text:   "Que hacemos hoy?",
-		ReplyMarkup: &models.InlineKeyboardMarkup{
-			InlineKeyboard: rows,
-		},
-	})
-}
 
 func (h *TelegramHandler) chat(ctx context.Context, b *tgbot.Bot, chatID int64, userMessage string) {
 	log.Printf("[DEBUG] llamando OpenAI con mensaje: %q", userMessage)
@@ -126,12 +93,15 @@ func (h *TelegramHandler) chat(ctx context.Context, b *tgbot.Bot, chatID int64, 
 
 	text, keyboard := parseQuickReplies(response)
 	log.Printf("[DEBUG] enviando mensaje a chatID %d", chatID)
-	_, sendErr := b.SendMessage(ctx, &tgbot.SendMessageParams{
-		ChatID:      chatID,
-		Text:        text,
-		ParseMode:   models.ParseModeHTML,
-		ReplyMarkup: keyboard,
-	})
+	params := &tgbot.SendMessageParams{
+		ChatID:    chatID,
+		Text:      text,
+		ParseMode: models.ParseModeHTML,
+	}
+	if keyboard != nil {
+		params.ReplyMarkup = keyboard
+	}
+	_, sendErr := b.SendMessage(ctx, params)
 	if sendErr != nil {
 		log.Printf("[DEBUG] error enviando mensaje: %v", sendErr)
 	}

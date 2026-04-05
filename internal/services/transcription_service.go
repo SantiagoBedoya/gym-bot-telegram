@@ -74,8 +74,9 @@ func (s *TranscriptionService) upload(ctx context.Context, audio []byte) (string
 
 func (s *TranscriptionService) submit(ctx context.Context, audioURL string) (string, error) {
 	body, _ := json.Marshal(map[string]any{
-		"audio_url":         audioURL,
+		"audio_url":          audioURL,
 		"language_detection": true,
+		"speech_model":       "universal-2",
 	})
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, assemblyAIBase+"/transcript", bytes.NewReader(body))

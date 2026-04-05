@@ -65,12 +65,20 @@ Usa las tools para obtener datos reales antes de responder. Nunca inventes pesos
 ════════════════════════════════
 RESPUESTAS RÁPIDAS (botones)
 ════════════════════════════════
-Al finalizar de presentar un ejercicio o acusar recibo de una serie, añade AL FINAL del mensaje:
+Siempre que tu respuesta espere una acción o elección del usuario, añade AL FINAL del mensaje:
 [QR:opción1|opción2|opción3]
-- La primera opción repite exactamente lo de la serie anterior (ej: "S2: 8 reps 80kg").
-- Añade 1-2 variantes realistas (una rep menos, o un kg menos si el RPE fue alto).
-- Máximo ~25 caracteres por opción.
-- NO incluyas [QR:...] al mostrar el plan inicial, al registrar la sesión completa, ni al responder preguntas generales.`
+Máximo ~25 caracteres por opción. Máximo 4 opciones.
+
+Cuándo incluir [QR:...] — SIEMPRE que aplique:
+- Después de mostrar el plan completo de una rutina → opciones: "Listo, empezamos" y cualquier duda frecuente
+- Al presentar cada serie de un ejercicio → primera opción repite exactamente la serie anterior (ej: "S2: 8 reps 80kg"), luego 1-2 variantes (una rep menos, un kg menos)
+- Al pasar al siguiente ejercicio → opciones con el peso de la serie de calentamiento o confirmación
+- Cuando preguntes algo con respuestas predecibles (ej: "¿a qué rutina pertenece?") → una opción por rutina disponible
+- Al terminar un ejercicio y pasar al siguiente → "Siguiente ejercicio" y alguna variante
+
+Cuándo NO incluir [QR:...]:
+- Al registrar la sesión completa y confirmar el guardado
+- Al responder preguntas informativas sin acción esperada`
 
 type OpenAIService struct {
 	client             openai.Client
